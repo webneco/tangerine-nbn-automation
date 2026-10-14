@@ -5,11 +5,13 @@
  *
  * Env:
  *   FFMPEG_PATH     ffmpeg binary to use (default: ffmpeg-static). Needs the gdigrab device.
- *   RECORD_REGION   "WIDTHxHEIGHT" — capture only that region from the top-left (primary monitor).
+ *   RECORD_REGION   "WIDTHxHEIGHT" from the top-left of the PRIMARY monitor (gdigrab offsets are
+ *                   relative to it). Default 1920x1080; "full" captures the whole virtual desktop.
  *   REPORT_SECONDS  how long to keep recording the report (default 12).
  * Any other env (JOB_PAYLOAD, UNIQUE_EMAIL, …) is passed through to the test.
  */
 import { spawn, spawnSync } from 'node:child_process';
+import net from 'node:net';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -113,11 +115,64 @@ const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 let interrupted = false;
 let testChild = null;
 let reportChild = null;
+let reportBrowser = null;
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.once('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+async function waitForHttp(url, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      if ((await fetch(url)).ok) return;
+    } catch {
+      /* server not up yet */
+    }
+    await sleep(300);
+  }
+  throw new Error(`${url} did not respond within ${timeoutMs} ms`);
+}
+
+/**
+ * Serve the report with `playwright show-report` WITHOUT its auto-open, then show it in our own
+ * Chromium window at 0,0 (same spot as the test browser) so it is guaranteed to be on screen.
+ * show-report has no --no-open flag; it skips opening when it thinks a coding agent runs it,
+ * so CLAUDECODE=1 is set for that child process only.
+ */
+async function showReportOnScreen() {
+  const port = await freePort();
+  const url = `http://127.0.0.1:${port}/`;
+  say(`Serving the HTML report at ${url} (no auto-open)`);
+  reportChild = spawn(`npx playwright show-report --host 127.0.0.1 --port ${port}`, {
+    cwd: ROOT,
+    stdio: 'inherit',
+    shell: true,
+    env: { ...process.env, CLAUDECODE: '1' },
+  });
+  await waitForHttp(url, 20_000);
+
+  const { chromium } = require('@playwright/test');
+  reportBrowser = await chromium.launch({ headless: false, args: ['--window-position=0,0', '--window-size=1366,900'] });
+  const page = await reportBrowser.newPage({ viewport: null });
+  await page.goto(url, { waitUntil: 'load' });
+  await page.bringToFront();
+  say(`Showing the HTML report for ${REPORT_SECONDS} s`);
+  await sleep(REPORT_SECONDS * 1_000);
+}
 
 process.on('SIGINT', async () => {
   if (interrupted) return;
   interrupted = true;
   say('Ctrl+C — saving the partial recording …');
+  await reportBrowser?.close().catch(() => {});
   killTree(reportChild);
   await stopFfmpeg();
   killTree(testChild);
@@ -129,8 +184,9 @@ async function main() {
   const bin = resolveFfmpeg();
   const out = path.join(REC_DIR, `tangerine-demo-${stamp}.mp4`);
 
-  const region = process.env.RECORD_REGION?.trim();
-  if (region && !/^\d+x\d+$/.test(region)) throw new Error(`RECORD_REGION must look like 1920x1080, got "${region}"`);
+  const rawRegion = (process.env.RECORD_REGION ?? '1920x1080').trim().toLowerCase();
+  const region = rawRegion === 'full' || rawRegion === '' ? null : rawRegion;
+  if (region && !/^\d+x\d+$/.test(region)) throw new Error(`RECORD_REGION must look like 1920x1080 or "full", got "${rawRegion}"`);
   const args = [
     '-y',
     '-loglevel', 'error',
@@ -162,11 +218,16 @@ async function main() {
   say(`Playwright exited with code ${testCode}`);
 
   if (!interrupted) {
-    say(`Showing the HTML report for ${REPORT_SECONDS} s`);
-    reportChild = spawn('npx playwright show-report', { cwd: ROOT, stdio: 'inherit', shell: true });
-    await sleep(REPORT_SECONDS * 1_000);
-    killTree(reportChild);
-    reportChild = null;
+    try {
+      await showReportOnScreen();
+    } catch (e) {
+      say(`Could not show the report: ${e.message}`);
+    } finally {
+      await reportBrowser?.close().catch(() => {});
+      reportBrowser = null;
+      killTree(reportChild);
+      reportChild = null;
+    }
   }
 
   await stopFfmpeg();
