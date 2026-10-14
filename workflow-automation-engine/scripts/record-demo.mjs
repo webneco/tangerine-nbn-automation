@@ -8,6 +8,7 @@
  *   RECORD_REGION   "WIDTHxHEIGHT" from the top-left of the PRIMARY monitor (gdigrab offsets are
  *                   relative to it). Default 1920x1080; "full" captures the whole virtual desktop.
  *   REPORT_SECONDS  how long to keep recording the report (default 12).
+ *   DEMO_HOLD_MS    passed to the test: ms to keep the confirmation page open (default 5000 here).
  * Any other env (JOB_PAYLOAD, UNIQUE_EMAIL, …) is passed through to the test.
  */
 import { spawn, spawnSync } from 'node:child_process';
@@ -212,7 +213,14 @@ async function main() {
   if (ffmpeg.exitCode !== null) throw new Error(`ffmpeg failed to start (exit ${ffmpeg.exitCode})`);
 
   say('Running: npx playwright test --grep @TangerineModule --headed');
-  testChild = spawn('npx playwright test --grep @TangerineModule --headed', { cwd: ROOT, stdio: 'inherit', shell: true });
+  const holdMs = process.env.DEMO_HOLD_MS ?? '5000';
+  say(`Holding the confirmation page for ${holdMs} ms (DEMO_HOLD_MS)`);
+  testChild = spawn('npx playwright test --grep @TangerineModule --headed', {
+    cwd: ROOT,
+    stdio: 'inherit',
+    shell: true,
+    env: { ...process.env, DEMO_HOLD_MS: holdMs },
+  });
   const testCode = (await exited(testChild)) ?? 1;
   testChild = null;
   say(`Playwright exited with code ${testCode}`);

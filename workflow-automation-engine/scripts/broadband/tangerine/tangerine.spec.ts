@@ -15,6 +15,9 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const STOP_AFTER_STEP = Number(process.env.STOP_AFTER_STEP || 0);
 const stopAfter = (n: number) => STOP_AFTER_STEP > 0 && STOP_AFTER_STEP <= n;
 
+/** Demo aid: ms to keep the browser on the confirmation page after Step 19 (default 0). */
+const DEMO_HOLD_MS = Math.max(0, Number(process.env.DEMO_HOLD_MS || 0)) || 0;
+
 test('Tangerine NBN sign-up journey', { tag: ['@TangerineModule', '@UserJourney', '@P1'] }, async ({ page, context }, testInfo) => {
   test.setTimeout(360_000);
 
@@ -82,6 +85,13 @@ test('Tangerine NBN sign-up journey', { tag: ['@TangerineModule', '@UserJourney'
     const { newTab } = await test.step('Step 17 — Confirm modal & Pay Now', () => confirmAndPay(j));
     await test.step('Step 18 — 3-D Secure', () => threeDSecure(j, newTab));
     transactionId = await test.step('Step 19 — Transaction ID', () => captureTransactionId(j));
+
+    // Demo-only: keep the confirmation page on screen for recordings (npm run demo:record sets 5000).
+    // Off (0) for normal runs, so it is not one of the journey's waits.
+    if (DEMO_HOLD_MS > 0) {
+      log(19, `DEMO_HOLD_MS — holding the confirmation page for ${DEMO_HOLD_MS} ms`);
+      await page.waitForTimeout(DEMO_HOLD_MS);
+    }
 
     status = 'passed';
   } catch (e) {

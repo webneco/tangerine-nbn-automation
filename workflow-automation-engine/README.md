@@ -72,6 +72,7 @@ Output goes to `recordings/` (git-ignored):
 |---|---|---|
 | `RECORD_REGION` | `1920x1080` | `WIDTHxHEIGHT` from the top-left of the **primary** monitor (gdigrab offsets are relative to it); `full` = whole virtual desktop (all monitors) |
 | `REPORT_SECONDS` | `12` | how long the report stays on screen in the recording |
+| `DEMO_HOLD_MS` | `5000` (via `demo:record`; `0` otherwise) | keeps the browser on the "You're done!" page after Step 19 so the transaction ID is visible in the video |
 | `FFMPEG_PATH` | `ffmpeg-static` binary | any ffmpeg with `gdigrab`, e.g. after `winget install Gyan.FFmpeg` |
 
 The browser always opens at (0, 0) — the primary monitor's top-left — at 1366×900, so it lands in the
@@ -79,6 +80,10 @@ same spot on every recording. After the test, the report is served by `playwrigh
 auto-open suppressed and shown in a Playwright Chromium window at the same position, so it is
 guaranteed to be in front (show-report has no `--no-open` flag; it skips opening when `CLAUDECODE`
 is set, so the script sets that for the report process only).
+
+To end an existing recording on the confirmation page and hold it for 5 s (note `-t` goes **before**
+`-i`; as an output option it would cut the held frames off again):
+`ffmpeg -t 122.4 -i in.mp4 -vf "tpad=stop_mode=clone:stop_duration=5" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p out.mp4`
 
 To turn an existing full-desktop recording into a primary-monitor one, crop it, e.g. for a primary
 monitor on the right of a 3840×1080 desktop:
