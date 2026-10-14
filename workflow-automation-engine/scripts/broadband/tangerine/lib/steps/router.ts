@@ -51,9 +51,16 @@ export async function selectRouter(j: Journey): Promise<string> {
       await dismissAccelerateGreat(page, 7);
       await j.idle.wait(800, 10_000);
       const tab = page.locator(tabSel);
-      if (!/\bactive\b/.test((await tab.getAttribute('class')) ?? '')) {
+      const panelId = await tab.getAttribute('aria-controls');
+      const panelButtons = page.locator(`#${panelId} ${SEL.router.outrightButton}`).filter({ visible: true });
+      const tabActive = /\bactive\b/.test((await tab.getAttribute('class')) ?? '');
+      // A re-render can leave the tab "active" while its panel is hidden, so
+      // click whenever the panel has no visible Outright buttons.
+      if (!tabActive || (await panelButtons.count()) === 0) {
+        log(7, `Opening tab ${tabSel} (active=${tabActive})`);
         await tab.scrollIntoViewIfNeeded();
         await tab.click({ timeout: 5_000 });
+        await panelButtons.first().waitFor({ state: 'visible', timeout: 5_000 });
       }
       const { btn, name } = await pick();
       chosen = name;
@@ -67,8 +74,10 @@ export async function selectRouter(j: Journey): Promise<string> {
       if (!chosenBtn) return false;
       await j.idle.wait(1200, 15_000); // let the card re-render settle before trusting its text
       const byName = page.locator(`${SEL.router.outrightButton}[data-product-name="${chosen}"]`);
-      const texts = await byName.allTextContents();
-      return texts.some((t) => /selected/i.test(t));
+      const texts = (await byName.allTextContents()).map((t) => t.trim());
+      const ok = texts.some((t) => /selected/i.test(t));
+      if (!ok) log(7, `"${chosen}" not selected yet (button text: ${texts.join(' / ') || 'none'})`);
+      return ok;
     },
     { timeoutMs: 45_000, label: `Select router "${model}"` },
   );

@@ -41,7 +41,9 @@ export async function appears(locator: Locator, timeoutMs: number): Promise<bool
 export class PortalIdle {
   private inflight = new Set<object>();
   private lastActivity = Date.now();
-  private static readonly WATCH = /\/(add-to-cart|remove-from-cart|get\/products|checkout\/get-sticky|address-order|address\/check|addressdetails)/;
+  // Only cart mutations and the product re-render. /checkout/get-sticky is a
+  // frequent read-only poll and would keep the page from ever looking idle.
+  private static readonly WATCH = /\/(add-to-cart|remove-from-cart|get\/products)(\?|$)/;
 
   constructor(page: Page) {
     page.on('request', (r) => {
@@ -64,6 +66,8 @@ export class PortalIdle {
       if (this.inflight.size === 0 && Date.now() - this.lastActivity >= quietMs) return;
       await sleep(150);
     }
+    const pending = [...this.inflight].map((r) => (r as { url(): string }).url().replace(/^https?:\/\/[^/]+/, ''));
+    console.warn(`[PortalIdle] not idle after ${timeoutMs} ms (in flight: ${pending.join(', ') || 'none'})`);
   }
 }
 
