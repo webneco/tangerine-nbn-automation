@@ -106,6 +106,23 @@ Generated inside the test body, so every run and every Playwright retry gets a f
 
 `status` is `running` while in flight, then `passed` or `failed: <first line of the error>` (written in a `finally`).
 
+Playwright empties `test-results/` at the start of every run, so the `<txnId>.png` there only
+survives until the next run — the copy attached to the HTML report and the CSV row are the
+durable record.
+
+## Notes from the live portal (TEST, Oct 2026)
+
+* Selectors not given in the brief were discovered from the live DOM and are tagged
+  `// discovered from live DOM` in `lib/selectors.ts`.
+* The documented `button.btnsm2.orderNow` does not exist; the live class is `btn-sm2`, so
+  `SEL.orderNow` lists both.
+* The current build renders no "Enter your address manually" link; when it is absent the
+  Step 2 fallback calls the portal's own `addressManual()` to open the same `#manual-address` form.
+* The "Heads up!" (`#accelerate-great`) popup appears after plan selection **and** on
+  `transfer-number-view`; it is dismissed wherever it can block a click.
+* With the TEST Visa the 3-D Secure challenge renders in the checkout tab (an iframe from
+  `test-gateway.tillpayments.com/test/acs/…`); new-tab challenges are handled too.
+
 ## Failure scenarios
 
 | # | Scenario | Behaviour implemented |
