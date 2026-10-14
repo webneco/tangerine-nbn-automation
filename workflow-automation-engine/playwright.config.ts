@@ -22,7 +22,10 @@ export default defineConfig({
     navigationTimeout: 60_000,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
-    video: 'retain-on-failure',
+    // Always record — a backup to the screen capture made by `npm run demo:record`.
+    video: { mode: 'on', size: { width: 1366, height: 900 } },
+    // Open headed windows at the same place every time so screen recordings line up.
+    launchOptions: { args: ['--window-position=0,0', '--window-size=1366,900'] },
     ...(httpCredentials ? { httpCredentials } : {}),
   },
 });

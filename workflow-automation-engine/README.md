@@ -53,6 +53,31 @@ pre-checkout / checkout steps without placing an order.
 
 > ⚠️ A full run submits a real order on the TEST portal with the Till Payments TEST card.
 
+## Demo recording
+
+```bash
+npm run demo:record
+```
+
+Records the screen with ffmpeg (`gdigrab`, 30 fps, H.264) while a **headed** run executes, then keeps
+recording the HTML report for a few seconds, stops ffmpeg gracefully (`q` on stdin, so the MP4 is
+finalised) and prints the MP4 path, size, test exit code and latest `emails-used.csv` row.
+It exits with Playwright's exit code; Ctrl+C still saves a partial recording.
+
+Output goes to `recordings/` (git-ignored):
+`tangerine-demo-<timestamp>.mp4`, plus copies of Playwright's own `video.webm` (video is always on,
+1366×900) and the `<txnId>.png` screenshot, taken before the next run wipes `test-results/`.
+
+| Env | Default | Effect |
+|---|---|---|
+| `RECORD_REGION` | whole virtual desktop | `WIDTHxHEIGHT` from the top-left, e.g. `1920x1080` for the left/primary monitor |
+| `REPORT_SECONDS` | `12` | how long the report stays on screen in the recording |
+| `FFMPEG_PATH` | `ffmpeg-static` binary | any ffmpeg with `gdigrab`, e.g. after `winget install Gyan.FFmpeg` |
+
+The browser always opens at (0, 0) at 1366×900 so it lands in the same spot on every recording.
+If npm blocked `ffmpeg-static`'s install script and `node_modules/ffmpeg-static/ffmpeg.exe` is missing,
+run `npm install-scripts approve ffmpeg-static && npm rebuild ffmpeg-static`, or set `FFMPEG_PATH`.
+
 ## Custom payload
 
 Priority: `JOB_PAYLOAD` (JSON string) → `JOB_PAYLOAD_FILE` (path) → `tangerineData.json`.
