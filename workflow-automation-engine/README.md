@@ -147,3 +147,16 @@ durable record.
 | 18 | 3-D Secure poll timeout | `expect.poll` for 60 s looking for `#transactionId` (frictionless) or an ACS `<select>` with an "Authenticated" option in a new tab / any frame; fails with `3-D Secure: neither #transactionId nor an ACS challenge appeared`. |
 | 19 | Transaction ID never shows | Waits 60 s for `#transactionId`; fails with `#transactionId not visible within 60 s (url …)`. CSV row is marked `failed: …`. |
 | 20 | Address → plan flow fails 3× | Steps 2–5 run up to 3 times with `page.reload()` between attempts; after the 3rd failure the last error is re-thrown. |
+
+## Verification (14 Oct 2026, TEST portal, sample payload)
+
+`npm run typecheck` clean. Full journey passed headed once and headless 3× (`--repeat-each=3`):
+
+| Run | Checkout email | Transaction ID | Duration | Notes |
+|---|---|---|---|---|
+| headed | prime150.261014141549nb9@yopmail.com | 1791967645TCO | 2.0 m | 3-DS challenge in checkout tab |
+| headless 1 | prime150.261014141821wp9@yopmail.com | 1791967804TCO | 4.8 m | steps ≈ 133 s; ~150 s spent outside the steps (launch/teardown) |
+| headless 2 | prime150.261014142323ssf@yopmail.com | 1791968099TCO | 2.1 m | |
+| headless 3 | prime150.261014142531xfz@yopmail.com | 1791968328TCO | 3.7 m | address check stalled → recovery reload → passed on attempt 2 |
+
+Typical step costs: address check (Step 3) 17–25 s, 3-D Secure (Step 18) 25–31 s.
